@@ -19,8 +19,8 @@ public class ArchipelagoService(
 {
     private readonly ConcurrentDictionary<(int GameId, string SlotName), ArchipelagoSession> sessions = new();
 
-    // Tracks which gameId already has a primary session subscribing to MessageLog.
-    private readonly ConcurrentDictionary<int, bool> primarySessions = new();
+    // Tracks the key of the session currently subscribed to MessageLog for each game.
+    private readonly ConcurrentDictionary<int, (int GameId, string SlotName)> primarySessions = new();
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -51,9 +51,16 @@ public class ArchipelagoService(
 
     public async Task ConnectAsync(int gameId, string host, int port, string slotName)
     {
-        if (sessions.TryGetValue((gameId, slotName), out var existing) && existing.Socket.Connected)
+        if (sessions.TryGetValue((gameId, slotName), out var existing))
         {
-            return;
+            if (existing.Socket.Connected)
+            {
+                return;
+            }
+
+            // Clean up the stale disconnected session before reconnecting.
+            await existing.Socket.DisconnectAsync();
+            sessions.TryRemove((gameId, slotName), out _);
         }
 
         var session = ArchipelagoSessionFactory.CreateSession(host, port);
@@ -75,8 +82,25 @@ public class ArchipelagoService(
 
         session.Items.ItemReceived += (helper) => OnItemReceived(gameId, slotName, helper);
 
-        // Only the first session per game subscribes to MessageLog to avoid duplicate notifications.
-        if (primarySessions.TryAdd(gameId, true))
+        // Subscribe to MessageLog if there is no primary session for this game yet,
+        // or if the existing primary session is no longer connected.
+        var sessionKey = (gameId, slotName);
+        var isPrimary = false;
+
+        if (primarySessions.TryGetValue(gameId, out var currentPrimaryKey))
+        {
+            if (!sessions.TryGetValue(currentPrimaryKey, out var currentPrimary) || !currentPrimary.Socket.Connected)
+            {
+                primarySessions[gameId] = sessionKey;
+                isPrimary = true;
+            }
+        }
+        else if (primarySessions.TryAdd(gameId, sessionKey))
+        {
+            isPrimary = true;
+        }
+
+        if (isPrimary)
         {
             session.MessageLog.OnMessageReceived += message =>
             {
@@ -96,8 +120,6 @@ public class ArchipelagoService(
         }
 
         logger.LogInformation("Connected slot {SlotName} for game {GameId} at {Host}:{Port}", slotName, gameId, host, port);
-
-        await Task.CompletedTask;
     }
 
     public async Task DisconnectAsync(int gameId)
