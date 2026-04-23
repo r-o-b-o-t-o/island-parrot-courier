@@ -192,13 +192,16 @@ public class ArchipelagoService(
         try
         {
             var item = helper.DequeueItem();
-            eventChannel.Writer.TryWrite(new ItemSentEvent(
+            if (!eventChannel.Writer.TryWrite(new ItemSentEvent(
                 gameId,
                 item.Player.Name,
                 slotName,
                 item.ItemDisplayName,
                 item.LocationDisplayName
-            ));
+            )))
+            {
+                logger.LogWarning("Event channel full; dropping ItemSentEvent for game {GameId}", gameId);
+            }
         }
         catch (Exception ex)
         {
@@ -210,10 +213,13 @@ public class ArchipelagoService(
     {
         try
         {
-            eventChannel.Writer.TryWrite(new PlayerCompletedEvent(
+            if (!eventChannel.Writer.TryWrite(new PlayerCompletedEvent(
                 gameId,
                 goalMessage.Player.Name
-            ));
+            )))
+            {
+                logger.LogWarning("Event channel full; dropping PlayerCompletedEvent for game {GameId}", gameId);
+            }
         }
         catch (Exception ex)
         {
@@ -225,11 +231,14 @@ public class ArchipelagoService(
     {
         try
         {
-            eventChannel.Writer.TryWrite(new PlayerJoinedEvent(
+            if (!eventChannel.Writer.TryWrite(new PlayerJoinedEvent(
                 gameId,
                 joinMessage.Player.Name,
                 joinMessage.Player.Game
-            ));
+            )))
+            {
+                logger.LogWarning("Event channel full; dropping PlayerJoinedEvent for game {GameId}", gameId);
+            }
         }
         catch (Exception ex)
         {
@@ -241,10 +250,13 @@ public class ArchipelagoService(
     {
         try
         {
-            eventChannel.Writer.TryWrite(new PlayerLeftEvent(
+            if (!eventChannel.Writer.TryWrite(new PlayerLeftEvent(
                 gameId,
                 leaveMessage.Player.Name
-            ));
+            )))
+            {
+                logger.LogWarning("Event channel full; dropping PlayerLeftEvent for game {GameId}", gameId);
+            }
         }
         catch (Exception ex)
         {
