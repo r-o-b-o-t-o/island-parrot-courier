@@ -38,12 +38,7 @@ public static class Program
     {
         services
             .AddLogging(builder => builder.AddConsole())
-            .AddDbContext<AppDbContext>(options =>
-            {
-                var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
-                    ?? "Data Source=/app/data/islandparrotcourier.db";
-                options.UseSqlite(connectionString);
-            })
+            .ConfigureDb()
             .AddSingleton(new DiscordSocketConfig()
             {
                 GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMessages | GatewayIntents.GuildMembers
@@ -57,6 +52,23 @@ public static class Program
             .AddHostedService(sp => sp.GetRequiredService<ArchipelagoService>())
             .AddHostedService<GameEventDispatcher>()
             .AddHostedService<DiscordClientService>();
+    }
+
+    private static IServiceCollection ConfigureDb(this IServiceCollection services)
+    {
+        string sqliteConnectionString = Environment.GetEnvironmentVariable("SQLITE_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(sqliteConnectionString))
+        {
+            string dbPath = Path.Combine(AppContext.BaseDirectory, "data", "islandparrotcourier.db");
+            string dbDirectory = Path.GetDirectoryName(dbPath);
+            if (!string.IsNullOrWhiteSpace(dbDirectory))
+            {
+                Directory.CreateDirectory(dbDirectory);
+            }
+            sqliteConnectionString = $"Data Source=\"{dbPath}\"";
+        }
+
+        return services.AddDbContext<AppDbContext>(options => options.UseSqlite(sqliteConnectionString));
     }
 
     private static async Task MigrateDb(IServiceProvider services)
