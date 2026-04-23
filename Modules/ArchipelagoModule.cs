@@ -35,18 +35,14 @@ public class ArchipelagoModule(
             }
 
             var players = await gameRepository.GetPlayersAsync(game.Id);
-            var mentionBySlot = players.ToDictionary(
-                p => p.SlotName,
-                p => p.Mention,
-                StringComparer.InvariantCultureIgnoreCase
-            );
+            var mentionBySlot = players.ToDictionary(p => p.SlotName, p => p.Mention);
 
             string SlotMention(string slot, string playerName) =>
                 mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
 
             var hints = archipelagoService
                 .GetHints(game.Id, player.SlotName)
-                .Where(h => h.ReceivingSlot.Equals(player.SlotName, StringComparison.InvariantCultureIgnoreCase))
+                .Where(h => h.ReceivingSlot.Equals(player.SlotName))
                 .ToList();
 
             if (hints.Count == 0)
@@ -110,11 +106,7 @@ public class ArchipelagoModule(
             }
 
             var players = await gameRepository.GetPlayersAsync(game.Id);
-            var mentionBySlot = players.ToDictionary(
-                p => p.SlotName,
-                p => p.Mention,
-                StringComparer.InvariantCultureIgnoreCase
-            );
+            var mentionBySlot = players.ToDictionary(p => p.SlotName, p => p.Mention);
 
             string SlotMention(string slot, string playerName) =>
                 mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
@@ -122,8 +114,8 @@ public class ArchipelagoModule(
             var hints = archipelagoService
                 .GetHints(game.Id, player.SlotName)
                 .Where(h =>
-                    h.FindingSlot.Equals(player.SlotName, StringComparison.InvariantCultureIgnoreCase) &&
-                    !h.ReceivingSlot.Equals(player.SlotName, StringComparison.InvariantCultureIgnoreCase)
+                    h.FindingSlot.Equals(player.SlotName) &&
+                    !h.ReceivingSlot.Equals(player.SlotName)
                 )
                 .ToList();
 
@@ -199,7 +191,7 @@ public class ArchipelagoModule(
             {
                 string playerName = data.SlotName;
 
-                var player = game.Players.FirstOrDefault(p => p.SlotName.Equals(data.SlotName, StringComparison.InvariantCultureIgnoreCase));
+                var player = game.Players.FirstOrDefault(p => p.SlotName.Equals(data.SlotName));
                 if (player != null)
                 {
                     var discordUser = Context.Guild.GetUser(player.DiscordUserId);

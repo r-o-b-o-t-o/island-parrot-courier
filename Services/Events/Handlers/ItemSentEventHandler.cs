@@ -28,7 +28,7 @@ public class ItemSentEventHandler(
         var senderMention = senderPlayer?.Mention ?? $"**{gameEvent.SenderName}**";
         var recipientMention = recipientPlayer?.Mention ?? $"**{gameEvent.RecipientName}**";
 
-        var isSelfSend = gameEvent.SenderName.Equals(gameEvent.RecipientName, StringComparison.InvariantCultureIgnoreCase);
+        var isSelfSend = gameEvent.SenderName.Equals(gameEvent.RecipientName);
 
         var description = isSelfSend
             ? $"{senderMention} found their **{gameEvent.ItemName}** from *{gameEvent.LocationName}*"
