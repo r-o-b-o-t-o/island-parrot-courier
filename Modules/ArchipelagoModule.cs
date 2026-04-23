@@ -13,6 +13,7 @@ public class ArchipelagoModule(
     ) : InteractionModuleBase<SocketInteractionContext>
 {
     [SlashCommand("hints-incoming", "Items that will be sent to you, wherever they are in the multiworld")]
+    [CommandContextType(InteractionContextType.Guild | InteractionContextType.PrivateChannel)]
     public async Task GetIncomingHintsAsync()
     {
         await DeferAsync(ephemeral: true);
@@ -86,6 +87,7 @@ public class ArchipelagoModule(
     }
 
     [SlashCommand("hints-outgoing", "Items in your world that belong to other players")]
+    [CommandContextType(InteractionContextType.Guild | InteractionContextType.PrivateChannel)]
     public async Task GetOutgoingHintsAsync()
     {
         await DeferAsync(ephemeral: true);
@@ -162,6 +164,7 @@ public class ArchipelagoModule(
     }
 
     [SlashCommand("progress", "View the current game progress")]
+    [CommandContextType(InteractionContextType.Guild | InteractionContextType.PrivateChannel)]
     public async Task GetProgressAsync()
     {
         await DeferAsync();

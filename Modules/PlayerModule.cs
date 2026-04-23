@@ -12,6 +12,7 @@ public class PlayerModule(
     ) : InteractionModuleBase<SocketInteractionContext>
 {
     [SlashCommand("register", "Register yourself to the current game with an Archipelago slot")]
+    [CommandContextType(InteractionContextType.Guild | InteractionContextType.PrivateChannel)]
     public async Task RegisterSelfAsync(
         [Summary("slot", "Your Archipelago slot name")] string slot)
     {
@@ -56,7 +57,8 @@ public class PlayerModule(
         }
     }
 
-    [SlashCommand("register-user", "Register another user to the current game (Admin only)")]
+    [SlashCommand("register-user", "Register another user to the current game")]
+    [CommandContextType(InteractionContextType.Guild | InteractionContextType.PrivateChannel)]
     [RequireUserPermission(GuildPermission.Administrator)]
     public async Task RegisterUserAsync(
         [Summary("slot", "Archipelago slot name")] string slot,
