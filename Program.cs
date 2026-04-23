@@ -18,7 +18,7 @@ public static class Program
     public static async Task Main(string[] args)
     {
 #if DEBUG
-        string dir = Environment.GetEnvironmentVariable("DEBUG_PROJECT_DIR") ?? Environment.CurrentDirectory;
+        string dir = Environment.GetEnvironmentVariable("DEBUG_PROJECT_DIR") ?? AppContext.BaseDirectory;
         string file = Path.Combine(dir, ".env");
         DotEnv.Load(new DotEnvOptions(envFilePaths: [file]));
 #else
