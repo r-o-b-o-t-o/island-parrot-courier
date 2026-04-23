@@ -8,7 +8,7 @@ namespace IslandParrotCourier.Modules;
 public class GameModule(IGameRepository gameRepository) : InteractionModuleBase<SocketInteractionContext>
 {
     [SlashCommand("create", "Create a new Archipelago game session linked to this channel")]
-    [CommandContextType(InteractionContextType.Guild | InteractionContextType.PrivateChannel)]
+    [CommandContextType(InteractionContextType.Guild)]
     [RequireUserPermission(GuildPermission.Administrator)]
     public async Task CreateGameAsync(
         [Summary("name", "Name for this game session")] string name,
