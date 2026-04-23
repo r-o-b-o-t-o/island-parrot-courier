@@ -4,7 +4,7 @@ A Discord bot that integrates with [Archipelago](https://archipelago.gg/) multiw
 
 ![.NET 10](https://img.shields.io/badge/.NET-10-purple)
 ![Discord.Net](https://img.shields.io/badge/Discord.Net-3.19-blue)
-![Archipelago](https://img.shields.io/badge/Archipelago-MultiClient-green)
+![Archipelago](https://img.shields.io/badge/Archipelago-MultiClient.Net-green)
 
 ---
 
