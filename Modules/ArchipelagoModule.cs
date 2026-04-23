@@ -41,11 +41,12 @@ public class ArchipelagoModule(
                 StringComparer.InvariantCultureIgnoreCase
             );
 
-            string SlotMention(string slotName) => mentionBySlot.TryGetValue(slotName, out var m) ? m : $"**{slotName}**";
+            string SlotMention(string slot, string playerName) =>
+                mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
 
             var hints = archipelagoService
                 .GetHints(game.Id, player.SlotName)
-                .Where(h => h.ReceivingPlayer.Equals(player.SlotName, StringComparison.InvariantCultureIgnoreCase))
+                .Where(h => h.ReceivingSlot.Equals(player.SlotName, StringComparison.InvariantCultureIgnoreCase))
                 .ToList();
 
             if (hints.Count == 0)
@@ -58,7 +59,7 @@ public class ArchipelagoModule(
             foreach (var hint in hints)
             {
                 var status = hint.Found ? "✅" : "❓";
-                sb.AppendLine($"{status} **{hint.ItemName}** at {SlotMention(hint.FindingPlayer)}'s *{hint.LocationName}*");
+                sb.AppendLine($"{status} **{hint.ItemName}** at {SlotMention(hint.FindingSlot, hint.FindingPlayerName)}'s *{hint.LocationName}*");
             }
 
             string playerName = player.SlotName;
@@ -115,13 +116,14 @@ public class ArchipelagoModule(
                 StringComparer.InvariantCultureIgnoreCase
             );
 
-            string SlotMention(string slotName) => mentionBySlot.TryGetValue(slotName, out var m) ? m : $"**{slotName}**";
+            string SlotMention(string slot, string playerName) =>
+                mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
 
             var hints = archipelagoService
                 .GetHints(game.Id, player.SlotName)
                 .Where(h =>
-                    h.FindingPlayer.Equals(player.SlotName, StringComparison.InvariantCultureIgnoreCase) &&
-                    !h.ReceivingPlayer.Equals(player.SlotName, StringComparison.InvariantCultureIgnoreCase)
+                    h.FindingSlot.Equals(player.SlotName, StringComparison.InvariantCultureIgnoreCase) &&
+                    !h.ReceivingSlot.Equals(player.SlotName, StringComparison.InvariantCultureIgnoreCase)
                 )
                 .ToList();
 
@@ -135,7 +137,7 @@ public class ArchipelagoModule(
             foreach (var hint in hints)
             {
                 var status = hint.Found ? "✅" : "❓";
-                sb.AppendLine($"{status} {SlotMention(hint.ReceivingPlayer)}'s **{hint.ItemName}** at *{hint.LocationName}*");
+                sb.AppendLine($"{status} {SlotMention(hint.ReceivingSlot, hint.ReceivingPlayerName)}'s **{hint.ItemName}** at *{hint.LocationName}*");
             }
 
             string playerName = player.SlotName;

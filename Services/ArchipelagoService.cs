@@ -138,8 +138,10 @@ public class ArchipelagoService(
         {
             ItemName = session.Items.GetItemName(h.ItemId, session.Players.GetPlayerInfo(h.ReceivingPlayer)?.Game ?? ""),
             LocationName = session.Locations.GetLocationNameFromId(h.LocationId, session.Players.GetPlayerInfo(h.FindingPlayer)?.Game ?? ""),
-            FindingPlayer = session.Players.GetPlayerName(h.FindingPlayer) ?? "Unknown",
-            ReceivingPlayer = session.Players.GetPlayerName(h.ReceivingPlayer) ?? "Unknown",
+            FindingSlot = session.Players.GetPlayerName(h.FindingPlayer) ?? "Unknown",
+            FindingPlayerName = session.Players.GetPlayerAlias(h.FindingPlayer) ?? "Unknown",
+            ReceivingSlot = session.Players.GetPlayerName(h.ReceivingPlayer) ?? "Unknown",
+            ReceivingPlayerName = session.Players.GetPlayerAlias(h.ReceivingPlayer) ?? "Unknown",
             Found = h.Found
         }).ToList();
     }

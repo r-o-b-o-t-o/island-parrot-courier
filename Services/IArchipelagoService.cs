@@ -14,8 +14,10 @@ public class HintInfo
 {
     public string ItemName { get; set; } = "";
     public string LocationName { get; set; } = "";
-    public string FindingPlayer { get; set; } = "";
-    public string ReceivingPlayer { get; set; } = "";
+    public string FindingSlot { get; set; } = "";
+    public string FindingPlayerName { get; set; } = "";
+    public string ReceivingSlot { get; set; } = "";
+    public string ReceivingPlayerName { get; set; } = "";
     public bool Found { get; set; }
 }
 
