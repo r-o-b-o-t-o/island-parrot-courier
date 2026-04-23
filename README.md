@@ -29,8 +29,8 @@ A Discord bot that integrates with [Archipelago](https://archipelago.gg/) multiw
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/IslandParrotCourier.git
-   cd IslandParrotCourier
+   git clone https://github.com/r-o-b-o-t-o/island-parrot-courier.git
+   cd island-parrot-courier
    ```
 
 2. **Configure the environment**
