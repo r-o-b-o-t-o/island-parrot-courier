@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "IslandParrotCourier": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DEBUG_PROJECT_DIR": "$(ProjectDir)"
+      }
+    }
+  }
+}
