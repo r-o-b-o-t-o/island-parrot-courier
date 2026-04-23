@@ -39,8 +39,8 @@ public class PlayerModule(
                 return;
             }
 
-            await gameRepository.RegisterPlayerAsync(game, Context.User.Id, slot);
             await archipelagoService.ConnectAsync(game.Id, game.Host, game.Port, slot);
+            await gameRepository.RegisterPlayerAsync(game, Context.User.Id, slot);
 
             var embed = new EmbedBuilder()
                 .WithColor(Color.Green)
