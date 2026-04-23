@@ -234,8 +234,8 @@ public class ArchipelagoModule(
 
     private static string BuildProgressBar(double percentage, int length = 10)
     {
-        var filled = (int)Math.Round(percentage / 100 * length);
+        var filled = Math.Clamp((int)Math.Round(percentage / 100 * length), 0, length);
         var empty = length - filled;
-        return $"[{"█".PadRight(filled, '█')}{"░".PadRight(empty, '░')}]";
+        return $"[{new string('█', filled)}{new string('░', empty)}]";
     }
 }
