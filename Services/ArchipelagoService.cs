@@ -158,7 +158,8 @@ public class ArchipelagoService(
 
         return gameSlotSessions.Select(s => new PlayerProgress()
         {
-            SlotName = s.Players.GetPlayerName(s.ConnectionInfo.Slot) ?? "Unknown",
+            Slot = s.Players.GetPlayerName(s.ConnectionInfo.Slot) ?? "Unknown",
+            PlayerName = s.Players.GetPlayerAlias(s.ConnectionInfo.Slot) ?? "Unknown",
             LocationsChecked = s.Locations.AllLocationsChecked.Count,
             TotalLocations = s.Locations.AllLocations.Count
         }).ToList();

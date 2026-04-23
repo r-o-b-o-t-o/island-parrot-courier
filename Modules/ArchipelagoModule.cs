@@ -192,9 +192,9 @@ public class ArchipelagoModule(
             }
             foreach (var data in progress.OrderByDescending(p => p.Percentage))
             {
-                string playerName = data.SlotName;
+                string playerName = data.PlayerName;
 
-                var player = game.Players.FirstOrDefault(p => p.SlotName.Equals(data.SlotName));
+                var player = game.Players.FirstOrDefault(p => p.SlotName.Equals(data.Slot));
                 if (player != null && Context.Guild != null)
                 {
                     var discordUser = Context.Guild.GetUser(player.DiscordUserId);

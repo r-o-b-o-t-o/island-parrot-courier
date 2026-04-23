@@ -23,7 +23,8 @@ public class HintInfo
 
 public class PlayerProgress
 {
-    public string SlotName { get; set; } = "";
+    public string Slot { get; set; } = "";
+    public string PlayerName { get; set; } = "";
     public long LocationsChecked { get; set; }
     public long TotalLocations { get; set; }
     public double Percentage => TotalLocations == 0 ? 0 : Math.Round((double)LocationsChecked / TotalLocations * 100, 2);
