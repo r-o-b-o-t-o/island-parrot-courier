@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
@@ -10,11 +11,13 @@ namespace IslandParrotCourier.Services;
 public class DiscordClientService(
         DiscordSocketClient client,
         InteractionService interactions,
+        IServiceProvider services,
         IServiceScopeFactory scopeFactory,
         ILogger<DiscordClientService> logger
     ) : IHostedService, IDiscordClientService
 {
     private bool commandsRegistered;
+    private readonly ConcurrentDictionary<IInteractionContext, IServiceScope> activeScopes = new();
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -35,8 +38,7 @@ public class DiscordClientService(
             }
             commandsRegistered = true;
 
-            using var scope = scopeFactory.CreateScope();
-            await interactions.AddModulesAsync(typeof(DiscordClientService).Assembly, scope.ServiceProvider);
+            await interactions.AddModulesAsync(typeof(DiscordClientService).Assembly, services);
 
             var guildIdStr = Environment.GetEnvironmentVariable("DISCORD_GUILD_ID");
             if (ulong.TryParse(guildIdStr, out var guildId))
@@ -53,9 +55,19 @@ public class DiscordClientService(
 
         client.InteractionCreated += async interaction =>
         {
-            using var scope = scopeFactory.CreateScope();
+            var scope = scopeFactory.CreateScope();
             var ctx = new SocketInteractionContext(client, interaction);
+            activeScopes[ctx] = scope;
             await interactions.ExecuteCommandAsync(ctx, scope.ServiceProvider);
+        };
+
+        interactions.InteractionExecuted += (_, ctx, _) =>
+        {
+            if (activeScopes.TryRemove(ctx, out var scope))
+            {
+                scope.Dispose();
+            }
+            return Task.CompletedTask;
         };
 
         await client.LoginAsync(TokenType.Bot, token);
