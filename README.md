@@ -58,12 +58,12 @@ docker compose up -d
 
 | Command | Description | Permission |
 |---------|-------------|------------|
-| `/game create` | Create a new game session linked to the current channel | Admin |
-| `/player register` | Register yourself with a slot name | Everyone |
-| `/player register-user` | Register another user | Admin |
-| `/archipelago hints-incoming` | View hints for your items | Everyone |
-| `/archipelago hints-outgoing` | View hints for other players' items | Everyone |
-| `/archipelago progress` | View game progress | Everyone |
+| `/game create` | Create a new game session linked to the current channel | 🛡️ Admin |
+| `/player register` | Register yourself with a slot name | 👤 Everyone |
+| `/player register-user` | Register another user | 🛡️ Admin |
+| `/archipelago hints-incoming` | View hints for your items | 👤 Everyone |
+| `/archipelago hints-outgoing` | View hints for other players' items | 👤 Everyone |
+| `/archipelago progress` | View game progress | 👤 Everyone |
 
 ## 🏗️ Architecture
 
