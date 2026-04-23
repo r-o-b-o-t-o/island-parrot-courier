@@ -4,7 +4,7 @@ public interface IArchipelagoService
 {
     /// <summary>Connects a single slot session. Safe to call when already connected.</summary>
     Task ConnectAsync(int gameId, string host, int port, string slotName);
-    void Disconnect(int gameId);
+    Task DisconnectAsync(int gameId);
     bool IsConnected(int gameId, string slotName);
     List<HintInfo> GetHints(int gameId, string slotName);
     List<PlayerProgress> GetProgress(int gameId);

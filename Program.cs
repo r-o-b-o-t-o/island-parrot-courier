@@ -38,7 +38,12 @@ public static class Program
     {
         services
             .AddLogging(builder => builder.AddConsole())
-            .AddDbContext<AppDbContext>(options => options.UseSqlite("Data Source=islandparrotcourier.db"))
+            .AddDbContext<AppDbContext>(options =>
+            {
+                var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
+                    ?? "Data Source=/app/data/islandparrotcourier.db";
+                options.UseSqlite(connectionString);
+            })
             .AddSingleton(new DiscordSocketConfig()
             {
                 GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMessages | GatewayIntents.GuildMembers

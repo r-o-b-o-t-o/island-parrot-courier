@@ -44,18 +44,14 @@ public class ArchipelagoService(
         }
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
-        foreach (var session in sessions.Values)
-        {
-            session.Socket.DisconnectAsync();
-        }
-        return Task.CompletedTask;
+        await Task.WhenAll(sessions.Values.Select(s => s.Socket.DisconnectAsync()));
     }
 
     public async Task ConnectAsync(int gameId, string host, int port, string slotName)
     {
-        if (sessions.ContainsKey((gameId, slotName)))
+        if (sessions.TryGetValue((gameId, slotName), out var existing) && existing.Socket.Connected)
         {
             return;
         }
@@ -104,16 +100,18 @@ public class ArchipelagoService(
         await Task.CompletedTask;
     }
 
-    public void Disconnect(int gameId)
+    public async Task DisconnectAsync(int gameId)
     {
         var keys = sessions.Keys.Where(k => k.GameId == gameId).ToList();
+        var disconnectTasks = new List<Task>();
         foreach (var key in keys)
         {
             if (sessions.TryRemove(key, out var session))
             {
-                session.Socket.DisconnectAsync();
+                disconnectTasks.Add(session.Socket.DisconnectAsync());
             }
         }
+        await Task.WhenAll(disconnectTasks);
         primarySessions.TryRemove(gameId, out _);
         logger.LogInformation("Disconnected all sessions for game {GameId}", gameId);
     }

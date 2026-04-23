@@ -81,6 +81,12 @@ public class PlayerModule(
                 return;
             }
 
+            if (game.Players.Any(p => p.DiscordUserId == user.Id))
+            {
+                await FollowupAsync($"❌ {user.Mention} is already registered in **{game.Name}**.", ephemeral: true);
+                return;
+            }
+
             await gameRepository.RegisterPlayerAsync(game, user.Id, slot);
             await archipelagoService.ConnectAsync(game.Id, game.Host, game.Port, slot);
 

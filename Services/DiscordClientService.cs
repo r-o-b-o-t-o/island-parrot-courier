@@ -13,10 +13,7 @@ public class DiscordClientService(
         ILogger<DiscordClientService> logger
     ) : IHostedService, IDiscordClientService
 {
-    private readonly DiscordSocketClient client = client;
-    private readonly InteractionService interactions = interactions;
-    private readonly IServiceProvider services = services;
-    private readonly ILogger<DiscordClientService> logger = logger;
+    private bool commandsRegistered;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -31,6 +28,12 @@ public class DiscordClientService(
 
         client.Ready += async () =>
         {
+            if (commandsRegistered)
+            {
+                return;
+            }
+            commandsRegistered = true;
+
             await interactions.AddModulesAsync(typeof(DiscordClientService).Assembly, services);
 
             var guildIdStr = Environment.GetEnvironmentVariable("DISCORD_GUILD_ID");

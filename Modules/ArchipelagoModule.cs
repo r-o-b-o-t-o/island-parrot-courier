@@ -59,7 +59,7 @@ public class ArchipelagoModule(
             }
 
             string playerName = player.SlotName;
-            if (Context.User != null)
+            if (Context.User != null && Context.Guild != null)
             {
                 var discordUser = Context.Guild.GetUser(Context.User.Id);
                 if (discordUser is IGuildUser guildUser)
@@ -133,7 +133,7 @@ public class ArchipelagoModule(
             }
 
             string playerName = player.SlotName;
-            if (Context.User != null)
+            if (Context.User != null && Context.Guild != null)
             {
                 var discordUser = Context.Guild.GetUser(Context.User.Id);
                 if (discordUser is IGuildUser guildUser)
@@ -186,13 +186,16 @@ public class ArchipelagoModule(
             long totalChecked = 0;
             long totalLocations = 0;
 
-            await Context.Guild.DownloadUsersAsync();
+            if (Context.Guild != null)
+            {
+                await Context.Guild.DownloadUsersAsync();
+            }
             foreach (var data in progress.OrderByDescending(p => p.Percentage))
             {
                 string playerName = data.SlotName;
 
                 var player = game.Players.FirstOrDefault(p => p.SlotName.Equals(data.SlotName));
-                if (player != null)
+                if (player != null && Context.Guild != null)
                 {
                     var discordUser = Context.Guild.GetUser(player.DiscordUserId);
                     if (discordUser is IGuildUser guildUser)

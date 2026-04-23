@@ -6,8 +6,6 @@ namespace IslandParrotCourier.Services.Repositories;
 
 public class GameRepository(AppDbContext db) : IGameRepository
 {
-    private readonly AppDbContext db = db;
-
     public async Task<Game> CreateGameAsync(string name, string host, int port, ulong channelId)
     {
         Game game = new()
