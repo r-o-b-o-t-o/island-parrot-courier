@@ -1,6 +1,7 @@
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -9,7 +10,7 @@ namespace IslandParrotCourier.Services;
 public class DiscordClientService(
         DiscordSocketClient client,
         InteractionService interactions,
-        IServiceProvider services,
+        IServiceScopeFactory scopeFactory,
         ILogger<DiscordClientService> logger
     ) : IHostedService, IDiscordClientService
 {
@@ -34,7 +35,8 @@ public class DiscordClientService(
             }
             commandsRegistered = true;
 
-            await interactions.AddModulesAsync(typeof(DiscordClientService).Assembly, services);
+            using var scope = scopeFactory.CreateScope();
+            await interactions.AddModulesAsync(typeof(DiscordClientService).Assembly, scope.ServiceProvider);
 
             var guildIdStr = Environment.GetEnvironmentVariable("DISCORD_GUILD_ID");
             if (ulong.TryParse(guildIdStr, out var guildId))
@@ -51,8 +53,9 @@ public class DiscordClientService(
 
         client.InteractionCreated += async interaction =>
         {
+            using var scope = scopeFactory.CreateScope();
             var ctx = new SocketInteractionContext(client, interaction);
-            await interactions.ExecuteCommandAsync(ctx, services);
+            await interactions.ExecuteCommandAsync(ctx, scope.ServiceProvider);
         };
 
         await client.LoginAsync(TokenType.Bot, token);
