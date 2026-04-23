@@ -186,10 +186,6 @@ public class ArchipelagoModule(
             long totalChecked = 0;
             long totalLocations = 0;
 
-            if (Context.Guild != null)
-            {
-                await Context.Guild.DownloadUsersAsync();
-            }
             foreach (var data in progress.OrderByDescending(p => p.Percentage))
             {
                 string playerName = data.PlayerName;
@@ -197,8 +193,9 @@ public class ArchipelagoModule(
                 var player = game.Players.FirstOrDefault(p => p.SlotName.Equals(data.Slot));
                 if (player != null && Context.Guild != null)
                 {
-                    var discordUser = Context.Guild.GetUser(player.DiscordUserId);
-                    if (discordUser is IGuildUser guildUser)
+                    var guildUser = Context.Guild.GetUser(player.DiscordUserId)
+                        ?? await ((IGuild)Context.Guild).GetUserAsync(player.DiscordUserId);
+                    if (guildUser != null)
                     {
                         playerName = guildUser.DisplayName;
                     }
