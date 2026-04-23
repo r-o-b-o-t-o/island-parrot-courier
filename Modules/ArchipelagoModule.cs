@@ -202,8 +202,9 @@ public class ArchipelagoModule(
                 }
 
                 var bar = BuildProgressBar(data.Percentage);
+                var completedEmoji = player?.IsCompleted == true ? "🏆 " : "";
                 embed.AddField(
-                    playerName,
+                    $"{completedEmoji}{playerName}",
                     $"{bar} {data.Percentage}%\n{data.LocationsChecked}/{data.TotalLocations} locations",
                     inline: false
                 );
