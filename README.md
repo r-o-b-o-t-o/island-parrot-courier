@@ -80,7 +80,7 @@ IslandParrotCourier/
 │   │   │   ├── PlayerCompletedEventHandler.cs   # Announces world completion
 │   │   │   ├── PlayerJoinedEventHandler.cs      # Handles player join events
 │   │   │   └── PlayerLeftEventHandler.cs        # Handles player disconnect events
-│   │   ├── GameEventChannel.cs                  # Unbounded channel for async event queuing
+│   │   ├── GameEventChannel.cs                  # Bounded channel (capacity 1000, drops writes when full) for async event queuing
 │   │   ├── GameEventDispatcher.cs               # Hosted service that routes events to handlers
 │   │   └── IGameEvent.cs / IGameEventHandler.cs # Event contracts
 │   ├── Repositories/
@@ -98,7 +98,7 @@ IslandParrotCourier/
 |---------|------|
 | `ArchipelagoService` | Hosted service that connects to Archipelago servers, tracks active sessions per game, and publishes events to `GameEventChannel` |
 | `DiscordClientService` | Hosted service that starts the Discord WebSocket client and registers slash command interactions |
-| `GameEventChannel` | Thread-safe `System.Threading.Channels` pipeline used to decouple Archipelago event production from Discord notification delivery |
+| `GameEventChannel` | Thread-safe `System.Threading.Channels` pipeline (bounded, capacity 1000, drops writes when full) used to decouple Archipelago event production from Discord notification delivery; events may be dropped under sustained load |
 | `GameEventDispatcher` | Hosted service that reads from `GameEventChannel` and dispatches events to the appropriate `IGameEventHandler` |
 | `GameRepository` | EF Core repository providing scoped data access for game sessions and registered players |
 
