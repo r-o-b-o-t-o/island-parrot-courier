@@ -13,6 +13,7 @@ public class ArchipelagoModule(
     ) : InteractionModuleBase<SocketInteractionContext>
 {
     private const int MaxItemNameLength = 100;
+
     [SlashCommand("hints-incoming", "Items that will be sent to you, wherever they are in the multiworld")]
     [CommandContextType(InteractionContextType.Guild)]
     public async Task GetIncomingHintsAsync()
