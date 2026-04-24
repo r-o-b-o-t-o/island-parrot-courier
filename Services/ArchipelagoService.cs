@@ -18,6 +18,8 @@ public class ArchipelagoService(
         ILogger<ArchipelagoService> logger
     ) : IArchipelagoService, IHostedService
 {
+    private const int MaxItemNameLength = 100;
+
     private readonly ConcurrentDictionary<(int GameId, string SlotName), ArchipelagoSession> sessions = new();
 
     // Tracks the key of the session currently subscribed to MessageLog for each game.
@@ -155,9 +157,9 @@ public class ArchipelagoService(
             ?? throw new InvalidOperationException($"Could not find slot \"{slotName}\"");
 
         itemName = itemName.Trim().Replace("\r", "").Replace("\n", "");
-        if (itemName.Length > 100)
+        if (itemName.Length > MaxItemNameLength)
         {
-            itemName = itemName[..100];
+            itemName = itemName[..MaxItemNameLength];
         }
 
         // Initial timeout covers server response latency for the first hint.
@@ -166,7 +168,7 @@ public class ArchipelagoService(
         var initialTimeout = TimeSpan.FromSeconds(5);
         var debounceWindow = TimeSpan.FromMilliseconds(2500);
         using CancellationTokenSource cts = new(initialTimeout);
-        var ctsActive = true;
+        int ctsActive = 1;
 
         void OnMessage(LogMessage message)
         {
@@ -179,7 +181,7 @@ public class ArchipelagoService(
                 return;
             }
 
-            if (!ctsActive)
+            if (Volatile.Read(ref ctsActive) == 0)
             {
                 return;
             }
@@ -203,7 +205,7 @@ public class ArchipelagoService(
         }
         finally
         {
-            ctsActive = false;
+            Volatile.Write(ref ctsActive, 0);
             session.MessageLog.OnMessageReceived -= OnMessage;
         }
 

@@ -12,6 +12,7 @@ public class ArchipelagoModule(
         IArchipelagoService archipelagoService
     ) : InteractionModuleBase<SocketInteractionContext>
 {
+    private const int MaxItemNameLength = 100;
     [SlashCommand("hints-incoming", "Items that will be sent to you, wherever they are in the multiworld")]
     [CommandContextType(InteractionContextType.Guild)]
     public async Task GetIncomingHintsAsync()
@@ -187,9 +188,9 @@ public class ArchipelagoModule(
             await FollowupAsync("❌ Item name cannot be empty.", ephemeral: true);
             return;
         }
-        if (item.Length > 100)
+        if (item.Length > MaxItemNameLength)
         {
-            item = item[..100];
+            item = item[..MaxItemNameLength];
         }
 
         try
