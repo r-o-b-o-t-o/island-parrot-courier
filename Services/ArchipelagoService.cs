@@ -153,8 +153,13 @@ public class ArchipelagoService(
             throw new InvalidOperationException($"No active session for slot \"{slotName}\" in this game.");
         }
 
-        var player = session.Players.AllPlayers.FirstOrDefault(p => p.Name.Equals(slotName))
+        var player = session.Players.AllPlayers.FirstOrDefault(p => string.Equals(p.Name, slotName, StringComparison.Ordinal))
             ?? throw new InvalidOperationException($"Could not find slot \"{slotName}\"");
+
+        if (string.IsNullOrWhiteSpace(itemName))
+        {
+            throw new ArgumentException("Item name cannot be empty.", nameof(itemName));
+        }
 
         itemName = itemName.Trim().Replace("\r", "").Replace("\n", "");
         if (itemName.Length > MaxItemNameLength)
@@ -190,7 +195,10 @@ public class ArchipelagoService(
                 cts.CancelAfter(debounceWindow);
             }
             catch (ObjectDisposedException)
-            { }
+            {
+                // Expected race: the CTS was disposed between the active-flag check and CancelAfter.
+                // The finally block will clear the flag and unsubscribe the handler, so this is safe to ignore.
+            }
         }
 
         session.MessageLog.OnMessageReceived += OnMessage;
