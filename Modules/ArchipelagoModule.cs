@@ -51,12 +51,15 @@ public class ArchipelagoModule(
                 return;
             }
 
-            var sb = new StringBuilder();
-            foreach (var hint in hints)
-            {
-                var status = hint.Found ? "✅" : "❓";
-                sb.AppendLine($"{status} **{hint.ItemName}** at {SlotMention(hint.FindingSlot, hint.FindingPlayerName)}'s *{hint.LocationName}*");
-            }
+            var lines = hints
+                .OrderBy(h => h.Found)
+                .ThenBy(h => h.ItemName)
+                .ThenBy(h => h.LocationName)
+                .Select(hint =>
+                {
+                    var status = hint.Found ? "✅" : "❓";
+                    return $"{status} **{hint.ItemName}** at {SlotMention(hint.FindingSlot, hint.FindingPlayerName)}'s *{hint.LocationName}*";
+                });
 
             string playerName = player.SlotName;
             if (Context.User != null && Context.Guild != null)
@@ -68,14 +71,20 @@ public class ArchipelagoModule(
                 }
             }
 
-            var embed = new EmbedBuilder()
-                .WithColor(Color.Teal)
-                .WithTitle($"📥 Incoming Hints for {playerName}")
-                .WithDescription(sb.ToString())
-                .WithTimestamp(DateTimeOffset.UtcNow)
-                .Build();
-
-            await FollowupAsync(embed: embed);
+            var pages = SplitIntoPages(lines);
+            for (var i = 0; i < pages.Count; i++)
+            {
+                var title = pages.Count > 1
+                    ? $"📥 Incoming Hints for {playerName} ({i + 1}/{pages.Count})"
+                    : $"📥 Incoming Hints for {playerName}";
+                var embed = new EmbedBuilder()
+                    .WithColor(Color.Teal)
+                    .WithTitle(title)
+                    .WithDescription(pages[i])
+                    .WithTimestamp(DateTimeOffset.UtcNow)
+                    .Build();
+                await FollowupAsync(embed: embed, ephemeral: true);
+            }
         }
         catch (Exception ex)
         {
@@ -125,12 +134,15 @@ public class ArchipelagoModule(
                 return;
             }
 
-            var sb = new StringBuilder();
-            foreach (var hint in hints)
-            {
-                var status = hint.Found ? "✅" : "❓";
-                sb.AppendLine($"{status} {SlotMention(hint.ReceivingSlot, hint.ReceivingPlayerName)}'s **{hint.ItemName}** at *{hint.LocationName}*");
-            }
+            var lines = hints
+                .OrderBy(h => h.Found)
+                .ThenBy(h => h.ItemName)
+                .ThenBy(h => h.LocationName)
+                .Select(hint =>
+                {
+                    var status = hint.Found ? "✅" : "❓";
+                    return $"{status} {SlotMention(hint.ReceivingSlot, hint.ReceivingPlayerName)}'s **{hint.ItemName}** at *{hint.LocationName}*";
+                });
 
             string playerName = player.SlotName;
             if (Context.User != null && Context.Guild != null)
@@ -142,14 +154,20 @@ public class ArchipelagoModule(
                 }
             }
 
-            var embed = new EmbedBuilder()
-                .WithColor(Color.Orange)
-                .WithTitle($"🔍 Outgoing Hints for {playerName}")
-                .WithDescription(sb.ToString())
-                .WithTimestamp(DateTimeOffset.UtcNow)
-                .Build();
-
-            await FollowupAsync(embed: embed);
+            var pages = SplitIntoPages(lines);
+            for (var i = 0; i < pages.Count; i++)
+            {
+                var title = pages.Count > 1
+                    ? $"🔍 Outgoing Hints for {playerName} ({i + 1}/{pages.Count})"
+                    : $"🔍 Outgoing Hints for {playerName}";
+                var embed = new EmbedBuilder()
+                    .WithColor(Color.Orange)
+                    .WithTitle(title)
+                    .WithDescription(pages[i])
+                    .WithTimestamp(DateTimeOffset.UtcNow)
+                    .Build();
+                await FollowupAsync(embed: embed, ephemeral: true);
+            }
         }
         catch (Exception ex)
         {
@@ -235,5 +253,28 @@ public class ArchipelagoModule(
         var filled = Math.Clamp((int)Math.Round(percentage / 100 * length), 0, length);
         var empty = length - filled;
         return $"[{new string('█', filled)}{new string('░', empty)}]";
+    }
+
+    private static List<string> SplitIntoPages(IEnumerable<string> lines, int maxLength = 2048)
+    {
+        var pages = new List<string>();
+        var sb = new StringBuilder();
+
+        foreach (var line in lines)
+        {
+            if (sb.Length + line.Length + 1 > maxLength)
+            {
+                pages.Add(sb.ToString());
+                sb.Clear();
+            }
+            sb.AppendLine(line);
+        }
+
+        if (sb.Length > 0)
+        {
+            pages.Add(sb.ToString());
+        }
+
+        return pages;
     }
 }
