@@ -154,12 +154,19 @@ public class ArchipelagoService(
         var player = session.Players.AllPlayers.FirstOrDefault(p => p.Name.Equals(slotName))
             ?? throw new InvalidOperationException($"Could not find slot \"{slotName}\"");
 
+        itemName = itemName.Trim().Replace("\r", "").Replace("\n", "");
+        if (itemName.Length > 100)
+        {
+            itemName = itemName[..100];
+        }
+
         // Initial timeout covers server response latency for the first hint.
         // Each matching hint resets the deadline to a debounce window, so
         // we stop waiting 2500ms after the last hint in the batch arrives.
         var initialTimeout = TimeSpan.FromSeconds(5);
         var debounceWindow = TimeSpan.FromMilliseconds(2500);
         using CancellationTokenSource cts = new(initialTimeout);
+        var ctsActive = true;
 
         void OnMessage(LogMessage message)
         {
@@ -172,7 +179,16 @@ public class ArchipelagoService(
                 return;
             }
 
-            cts.CancelAfter(debounceWindow);
+            if (!ctsActive)
+            {
+                return;
+            }
+            try
+            {
+                cts.CancelAfter(debounceWindow);
+            }
+            catch (ObjectDisposedException)
+            { }
         }
 
         session.MessageLog.OnMessageReceived += OnMessage;
@@ -182,9 +198,12 @@ public class ArchipelagoService(
             await Task.Delay(Timeout.Infinite, cts.Token);
         }
         catch (OperationCanceledException)
-        { }
+        {
+            // Intentional: the debounce window or initial timeout fired, which is the expected exit path.
+        }
         finally
         {
+            ctsActive = false;
             session.MessageLog.OnMessageReceived -= OnMessage;
         }
 

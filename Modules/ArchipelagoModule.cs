@@ -181,6 +181,17 @@ public class ArchipelagoModule(
     {
         await DeferAsync(ephemeral: true);
 
+        item = item.Trim().Replace("\r", "").Replace("\n", "");
+        if (item.Length == 0)
+        {
+            await FollowupAsync("❌ Item name cannot be empty.", ephemeral: true);
+            return;
+        }
+        if (item.Length > 100)
+        {
+            item = item[..100];
+        }
+
         try
         {
             var game = await gameRepository.GetGameByChannelAsync(Context.Channel.Id);
