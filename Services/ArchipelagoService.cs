@@ -158,7 +158,7 @@ public class ArchipelagoService(
 
         if (string.IsNullOrWhiteSpace(itemName))
         {
-            throw new ArgumentException("Item name cannot be empty.", nameof(itemName));
+            throw new ArgumentException("Item name cannot be null, empty, or whitespace.", nameof(itemName));
         }
 
         itemName = itemName.Trim().Replace("\r", "").Replace("\n", "");
