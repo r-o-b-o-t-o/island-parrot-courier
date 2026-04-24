@@ -7,6 +7,8 @@ public interface IArchipelagoService
     Task DisconnectAsync(int gameId);
     bool IsConnected(int gameId, string slotName);
     List<HintInfo> GetHints(int gameId, string slotName);
+    /// <summary>Sends a hint request for the given item name and returns the matching hints.</summary>
+    Task<List<HintInfo>> HintItemAsync(int gameId, string slotName, string itemName);
     List<PlayerProgress> GetProgress(int gameId);
 }
 
