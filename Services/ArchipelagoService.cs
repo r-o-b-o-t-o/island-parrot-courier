@@ -153,7 +153,7 @@ public class ArchipelagoService(
             throw new InvalidOperationException($"No active session for slot \"{slotName}\" in this game.");
         }
 
-        var player = session.Players.AllPlayers.FirstOrDefault(p => string.Equals(p.Name, slotName, StringComparison.Ordinal))
+        var player = session.Players.AllPlayers.FirstOrDefault(p => string.Equals(p.Name, slotName))
             ?? throw new InvalidOperationException($"Could not find slot \"{slotName}\"");
 
         if (string.IsNullOrWhiteSpace(itemName))
