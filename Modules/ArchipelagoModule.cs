@@ -198,7 +198,7 @@ public class ArchipelagoModule(
             var SlotMention = await BuildSlotMentionAsync(game.Id);
 
             // Sanitize item for safe display in Discord messages and embed titles
-            var itemDisplay = item.Trim().Replace("\r", "").Replace("\n", "");
+            var itemDisplay = item.Trim().ReplaceLineEndings("");
             var itemSafe = Format.Sanitize(itemDisplay);
 
             var hints = await archipelagoService.HintItemAsync(game.Id, player.SlotName, item);
@@ -313,7 +313,7 @@ public class ArchipelagoModule(
     {
         var players = await gameRepository.GetPlayersAsync(gameId);
         var mentionBySlot = players.ToDictionary(p => p.SlotName, p => p.Mention);
-        return (slot, playerName) => mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
+        return (slot, playerName) => mentionBySlot.TryGetValue(slot, out var mention) ? mention : $"**{playerName}**";
     }
 
     private static string BuildProgressBar(double percentage, int length = 10)
