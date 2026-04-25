@@ -161,7 +161,7 @@ public class ArchipelagoService(
             throw new ArgumentException("Item name cannot be null, empty, or whitespace.", nameof(itemName));
         }
 
-        itemName = itemName.Trim().Replace("\r", "").Replace("\n", "");
+        itemName = itemName.Trim().ReplaceLineEndings("");
         if (itemName.Length > MaxItemNameLength)
         {
             itemName = itemName[..MaxItemNameLength];
