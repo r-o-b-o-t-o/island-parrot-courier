@@ -198,8 +198,15 @@ public class ArchipelagoModule(
             var SlotMention = await BuildSlotMentionAsync(game.Id);
 
             // Sanitize item for safe display in Discord messages and embed titles
+            // Discord embed titles are limited to 256 characters; cap itemSafe to leave room for the title prefix/suffix
             var itemDisplay = item.Trim().ReplaceLineEndings("");
             var itemSafe = Format.Sanitize(itemDisplay);
+            const int embedTitleLimit = 256;
+            const string titlePrefix = "🔎 Hints for \"\" (99/99)"; // worst-case overhead
+            if (itemSafe.Length > embedTitleLimit - titlePrefix.Length)
+            {
+                itemSafe = itemSafe[..(embedTitleLimit - titlePrefix.Length)];
+            }
 
             var hints = await archipelagoService.HintItemAsync(game.Id, player.SlotName, item);
 
