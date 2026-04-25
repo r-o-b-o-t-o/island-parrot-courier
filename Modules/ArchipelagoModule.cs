@@ -34,11 +34,7 @@ public class ArchipelagoModule(
                 return;
             }
 
-            var players = await gameRepository.GetPlayersAsync(game.Id);
-            var mentionBySlot = players.ToDictionary(p => p.SlotName, p => p.Mention);
-
-            string SlotMention(string slot, string playerName) =>
-                mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
+            var SlotMention = await BuildSlotMentionAsync(game.Id);
 
             var hints = archipelagoService
                 .GetHints(game.Id, player.SlotName)
@@ -114,11 +110,7 @@ public class ArchipelagoModule(
                 return;
             }
 
-            var players = await gameRepository.GetPlayersAsync(game.Id);
-            var mentionBySlot = players.ToDictionary(p => p.SlotName, p => p.Mention);
-
-            string SlotMention(string slot, string playerName) =>
-                mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
+            var SlotMention = await BuildSlotMentionAsync(game.Id);
 
             var hints = archipelagoService
                 .GetHints(game.Id, player.SlotName)
@@ -203,17 +195,17 @@ public class ArchipelagoModule(
                 return;
             }
 
-            var players = await gameRepository.GetPlayersAsync(game.Id);
-            var mentionBySlot = players.ToDictionary(p => p.SlotName, p => p.Mention);
+            var SlotMention = await BuildSlotMentionAsync(game.Id);
 
-            string SlotMention(string slot, string playerName) =>
-                mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
+            // Sanitize item for safe display in Discord messages and embed titles
+            var itemDisplay = item.Trim().Replace("\r", "").Replace("\n", "");
+            var itemSafe = Format.Sanitize(itemDisplay);
 
             var hints = await archipelagoService.HintItemAsync(game.Id, player.SlotName, item);
 
             if (hints.Count == 0)
             {
-                await FollowupAsync($"No hints found for **{item}**.", ephemeral: true);
+                await FollowupAsync($"No hints found for **{itemSafe}**.", ephemeral: true);
                 return;
             }
 
@@ -227,8 +219,8 @@ public class ArchipelagoModule(
             for (var i = 0; i < pages.Count; i++)
             {
                 var title = pages.Count > 1
-                    ? $"🔎 Hints for \"{item}\" ({i + 1}/{pages.Count})"
-                    : $"🔎 Hints for \"{item}\"";
+                    ? $"🔎 Hints for \"{itemSafe}\" ({i + 1}/{pages.Count})"
+                    : $"🔎 Hints for \"{itemSafe}\"";
                 var embed = new EmbedBuilder()
                     .WithColor(Color.Purple)
                     .WithTitle(title)
@@ -315,6 +307,13 @@ public class ArchipelagoModule(
         {
             await FollowupAsync($"❌ Failed to get progress: {ex.Message}", ephemeral: true);
         }
+    }
+
+    private async Task<Func<string, string, string>> BuildSlotMentionAsync(int gameId)
+    {
+        var players = await gameRepository.GetPlayersAsync(gameId);
+        var mentionBySlot = players.ToDictionary(p => p.SlotName, p => p.Mention);
+        return (slot, playerName) => mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
     }
 
     private static string BuildProgressBar(double percentage, int length = 10)
