@@ -3,6 +3,7 @@ using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
 using Archipelago.MultiClient.Net.Helpers;
 using Archipelago.MultiClient.Net.MessageLog.Messages;
+using Archipelago.MultiClient.Net.Packets;
 using IslandParrotCourier.Services.Events;
 using IslandParrotCourier.Services.Repositories;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,8 @@ public class ArchipelagoService(
         ILogger<ArchipelagoService> logger
     ) : IArchipelagoService, IHostedService
 {
+    private const int MaxItemNameLength = 100;
+
     private readonly ConcurrentDictionary<(int GameId, string SlotName), ArchipelagoSession> sessions = new();
 
     // Tracks the key of the session currently subscribed to MessageLog for each game.
@@ -141,6 +144,96 @@ public class ArchipelagoService(
     public bool IsConnected(int gameId, string slotName)
     {
         return sessions.TryGetValue((gameId, slotName), out var session) && session.Socket.Connected;
+    }
+
+    public async Task<List<HintInfo>> HintItemAsync(int gameId, string slotName, string itemName)
+    {
+        if (!sessions.TryGetValue((gameId, slotName), out var session))
+        {
+            throw new InvalidOperationException($"No active session for slot \"{slotName}\" in this game.");
+        }
+
+        var player = session.Players.AllPlayers.FirstOrDefault(p => string.Equals(p.Name, slotName))
+            ?? throw new InvalidOperationException($"Could not find slot \"{slotName}\"");
+
+        if (string.IsNullOrWhiteSpace(itemName))
+        {
+            throw new ArgumentException("Item name cannot be null, empty, or whitespace.", nameof(itemName));
+        }
+
+        itemName = itemName.Trim().ReplaceLineEndings("");
+        if (itemName.Length > MaxItemNameLength)
+        {
+            itemName = itemName[..MaxItemNameLength];
+        }
+
+        // Initial timeout covers server response latency for the first hint.
+        // Each matching hint resets the deadline to a debounce window, so
+        // we stop waiting 2500ms after the last hint in the batch arrives.
+        var initialTimeout = TimeSpan.FromSeconds(5);
+        var debounceWindow = TimeSpan.FromMilliseconds(2500);
+        using CancellationTokenSource cts = new(initialTimeout);
+        int ctsActive = 1;
+
+        void OnMessage(LogMessage message)
+        {
+            if (message is not HintItemSendLogMessage hint)
+            {
+                return;
+            }
+            if (!hint.Item.ItemName.Equals(itemName, StringComparison.InvariantCultureIgnoreCase))
+            {
+                return;
+            }
+
+            if (Volatile.Read(ref ctsActive) == 0)
+            {
+                return;
+            }
+            try
+            {
+                cts.CancelAfter(debounceWindow);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Expected race: the CTS was disposed between the active-flag check and CancelAfter.
+                // The finally block will clear the flag and unsubscribe the handler, so this is safe to ignore.
+            }
+        }
+
+        session.MessageLog.OnMessageReceived += OnMessage;
+        try
+        {
+            await session.Socket.SendPacketAsync(new SayPacket { Text = $"!hint {itemName}" });
+            await Task.Delay(Timeout.Infinite, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Intentional: the debounce window or initial timeout fired, which is the expected exit path.
+        }
+        finally
+        {
+            Volatile.Write(ref ctsActive, 0);
+            session.MessageLog.OnMessageReceived -= OnMessage;
+        }
+
+        var hints = await session.Hints.GetHintsAsync(player.Slot, null);
+        return hints
+            .Where(h => (session.Items.GetItemName(h.ItemId, session.Players.GetPlayerInfo(h.ReceivingPlayer)?.Game ?? "") ?? "")
+                .Equals(itemName, StringComparison.InvariantCultureIgnoreCase))
+            .Select(h => new HintInfo()
+            {
+                ItemName = session.Items.GetItemName(h.ItemId, session.Players.GetPlayerInfo(h.ReceivingPlayer)?.Game ?? "") ?? itemName,
+                LocationName = session.Locations.GetLocationNameFromId(h.LocationId, session.Players.GetPlayerInfo(h.FindingPlayer)?.Game ?? "") ?? "Unknown",
+                FindingSlot = session.Players.GetPlayerName(h.FindingPlayer) ?? "Unknown",
+                FindingPlayerName = session.Players.GetPlayerAlias(h.FindingPlayer) ?? "Unknown",
+                ReceivingSlot = session.Players.GetPlayerName(h.ReceivingPlayer) ?? "Unknown",
+                ReceivingPlayerName = session.Players.GetPlayerAlias(h.ReceivingPlayer) ?? "Unknown",
+                Found = h.Found
+            })
+            .OrderBy(h => h.Found)
+            .ThenBy(h => h.ReceivingPlayerName)
+            .ToList();
     }
 
     public List<HintInfo> GetHints(int gameId, string slotName)

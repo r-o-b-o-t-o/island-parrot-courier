@@ -34,11 +34,7 @@ public class ArchipelagoModule(
                 return;
             }
 
-            var players = await gameRepository.GetPlayersAsync(game.Id);
-            var mentionBySlot = players.ToDictionary(p => p.SlotName, p => p.Mention);
-
-            string SlotMention(string slot, string playerName) =>
-                mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
+            var SlotMention = await BuildSlotMentionAsync(game.Id);
 
             var hints = archipelagoService
                 .GetHints(game.Id, player.SlotName)
@@ -114,11 +110,7 @@ public class ArchipelagoModule(
                 return;
             }
 
-            var players = await gameRepository.GetPlayersAsync(game.Id);
-            var mentionBySlot = players.ToDictionary(p => p.SlotName, p => p.Mention);
-
-            string SlotMention(string slot, string playerName) =>
-                mentionBySlot.TryGetValue(slot, out var m) ? m : $"**{playerName}**";
+            var SlotMention = await BuildSlotMentionAsync(game.Id);
 
             var hints = archipelagoService
                 .GetHints(game.Id, player.SlotName)
@@ -172,6 +164,81 @@ public class ArchipelagoModule(
         catch (Exception ex)
         {
             await FollowupAsync($"❌ Failed to get hints: {ex.Message}", ephemeral: true);
+        }
+    }
+
+    [SlashCommand("hint", "Request a hint for a specific item")]
+    [CommandContextType(InteractionContextType.Guild)]
+    public async Task HintItemAsync([Summary("item", "The name of the item to hint for")] string item)
+    {
+        await DeferAsync(ephemeral: true);
+
+        if (string.IsNullOrWhiteSpace(item))
+        {
+            await FollowupAsync("❌ Item name cannot be empty.", ephemeral: true);
+            return;
+        }
+
+        try
+        {
+            var game = await gameRepository.GetGameByChannelAsync(Context.Channel.Id);
+            if (game == null)
+            {
+                await FollowupAsync("❌ No game is linked to this channel.", ephemeral: true);
+                return;
+            }
+
+            var player = game.Players.FirstOrDefault(p => p.DiscordUserId == Context.User.Id);
+            if (player == null)
+            {
+                await FollowupAsync("❌ You are not registered in this game.", ephemeral: true);
+                return;
+            }
+
+            var SlotMention = await BuildSlotMentionAsync(game.Id);
+
+            // Sanitize item for safe display in Discord messages and embed titles
+            // Discord embed titles are limited to 256 characters; cap itemSafe to leave room for the title prefix/suffix
+            var itemDisplay = Format.Sanitize(item.Trim().ReplaceLineEndings(""));
+            const int embedTitleLimit = 256;
+            const string titlePrefix = "🔎 Hints for \"\" (99/99)"; // worst-case overhead
+            if (itemDisplay.Length > embedTitleLimit - titlePrefix.Length)
+            {
+                itemDisplay = itemDisplay[..(embedTitleLimit - titlePrefix.Length)];
+            }
+
+            var hints = await archipelagoService.HintItemAsync(game.Id, player.SlotName, item);
+
+            if (hints.Count == 0)
+            {
+                await FollowupAsync($"No hints found for **{itemDisplay}**.", ephemeral: true);
+                return;
+            }
+
+            var lines = hints.Select(hint =>
+            {
+                var status = hint.Found ? "✅" : "❓";
+                return $"{status} {SlotMention(hint.ReceivingSlot, hint.ReceivingPlayerName)}'s **{hint.ItemName}** at {SlotMention(hint.FindingSlot, hint.FindingPlayerName)}'s *{hint.LocationName}*";
+            });
+
+            var pages = SplitIntoPages(lines);
+            for (var i = 0; i < pages.Count; i++)
+            {
+                var title = pages.Count > 1
+                    ? $"🔎 Hints for \"{itemDisplay}\" ({i + 1}/{pages.Count})"
+                    : $"🔎 Hints for \"{itemDisplay}\"";
+                var embed = new EmbedBuilder()
+                    .WithColor(Color.Purple)
+                    .WithTitle(title)
+                    .WithDescription(pages[i])
+                    .WithTimestamp(DateTimeOffset.UtcNow)
+                    .Build();
+                await FollowupAsync(embed: embed, ephemeral: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            await FollowupAsync($"❌ Failed to hint for item: {ex.Message}", ephemeral: true);
         }
     }
 
@@ -246,6 +313,13 @@ public class ArchipelagoModule(
         {
             await FollowupAsync($"❌ Failed to get progress: {ex.Message}", ephemeral: true);
         }
+    }
+
+    private async Task<Func<string, string, string>> BuildSlotMentionAsync(int gameId)
+    {
+        var players = await gameRepository.GetPlayersAsync(gameId);
+        var mentionBySlot = players.ToDictionary(p => p.SlotName, p => p.Mention);
+        return (slot, playerName) => mentionBySlot.TryGetValue(slot, out var mention) ? mention : $"**{playerName}**";
     }
 
     private static string BuildProgressBar(double percentage, int length = 10)
