@@ -199,20 +199,19 @@ public class ArchipelagoModule(
 
             // Sanitize item for safe display in Discord messages and embed titles
             // Discord embed titles are limited to 256 characters; cap itemSafe to leave room for the title prefix/suffix
-            var itemDisplay = item.Trim().ReplaceLineEndings("");
-            var itemSafe = Format.Sanitize(itemDisplay);
+            var itemDisplay = Format.Sanitize(item.Trim().ReplaceLineEndings(""));
             const int embedTitleLimit = 256;
             const string titlePrefix = "🔎 Hints for \"\" (99/99)"; // worst-case overhead
-            if (itemSafe.Length > embedTitleLimit - titlePrefix.Length)
+            if (itemDisplay.Length > embedTitleLimit - titlePrefix.Length)
             {
-                itemSafe = itemSafe[..(embedTitleLimit - titlePrefix.Length)];
+                itemDisplay = itemDisplay[..(embedTitleLimit - titlePrefix.Length)];
             }
 
             var hints = await archipelagoService.HintItemAsync(game.Id, player.SlotName, item);
 
             if (hints.Count == 0)
             {
-                await FollowupAsync($"No hints found for **{itemSafe}**.", ephemeral: true);
+                await FollowupAsync($"No hints found for **{itemDisplay}**.", ephemeral: true);
                 return;
             }
 
@@ -226,8 +225,8 @@ public class ArchipelagoModule(
             for (var i = 0; i < pages.Count; i++)
             {
                 var title = pages.Count > 1
-                    ? $"🔎 Hints for \"{itemSafe}\" ({i + 1}/{pages.Count})"
-                    : $"🔎 Hints for \"{itemSafe}\"";
+                    ? $"🔎 Hints for \"{itemDisplay}\" ({i + 1}/{pages.Count})"
+                    : $"🔎 Hints for \"{itemDisplay}\"";
                 var embed = new EmbedBuilder()
                     .WithColor(Color.Purple)
                     .WithTitle(title)
