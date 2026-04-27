@@ -284,16 +284,19 @@ public class ArchipelagoService(
     {
         try
         {
-            var item = helper.DequeueItem();
-            if (!eventChannel.Writer.TryWrite(new ItemSentEvent(
-                gameId,
-                item.Player.Name,
-                slotName,
-                item.ItemDisplayName,
-                item.LocationDisplayName
-            )))
+            while (helper.Any())
             {
-                logger.LogWarning("Event channel full; dropping ItemSentEvent for game {GameId}", gameId);
+                var item = helper.DequeueItem();
+                if (!eventChannel.Writer.TryWrite(new ItemSentEvent(
+                    gameId,
+                    item.Player.Name,
+                    slotName,
+                    item.ItemDisplayName,
+                    item.LocationDisplayName
+                )))
+                {
+                    logger.LogWarning("Event channel full; dropping ItemSentEvent for game {GameId}", gameId);
+                }
             }
         }
         catch (Exception ex)
