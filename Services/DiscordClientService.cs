@@ -30,7 +30,7 @@ public class DiscordClientService(
 
         client.Log += msg =>
         {
-            logger.LogInformation("{Message}", msg.ToString());
+            logger.LogInformation("{Message}", msg.ToString(prependTimestamp: false));
             return Task.CompletedTask;
         };
 
