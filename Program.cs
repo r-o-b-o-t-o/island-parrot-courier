@@ -51,7 +51,9 @@ public static class Program
             .AddSingleton<IArchipelagoService>(sp => sp.GetRequiredService<ArchipelagoService>())
             .AddHostedService(sp => sp.GetRequiredService<ArchipelagoService>())
             .AddHostedService<GameEventDispatcher>()
-            .AddHostedService<DiscordClientService>();
+            .AddSingleton<DiscordClientService>()
+            .AddSingleton<IDiscordClientService>(sp => sp.GetRequiredService<DiscordClientService>())
+            .AddHostedService(sp => sp.GetRequiredService<DiscordClientService>());
     }
 
     private static IServiceCollection ConfigureDb(this IServiceCollection services)

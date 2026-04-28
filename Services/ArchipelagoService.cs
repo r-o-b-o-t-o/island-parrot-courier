@@ -72,7 +72,6 @@ public class ArchipelagoService(
         using var scope = scopeFactory.CreateScope();
         var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
         var player = await gameRepository.GetPlayerBySlotAsync(gameId, slotName);
-        itemIndices[(gameId, slotName)] = player?.ItemIndex ?? 0;
 
         var session = ArchipelagoSessionFactory.CreateSession(host, port);
 
@@ -90,6 +89,7 @@ public class ArchipelagoService(
         }
 
         sessions[(gameId, slotName)] = session;
+        itemIndices[(gameId, slotName)] = player?.ItemIndex ?? 0;
 
         session.Items.ItemReceived += (helper) => OnItemReceived(gameId, slotName, helper);
 
