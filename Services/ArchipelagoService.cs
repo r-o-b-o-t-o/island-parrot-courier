@@ -147,9 +147,30 @@ public class ArchipelagoService(
             {
                 disconnectTasks.Add(session.Socket.DisconnectAsync());
             }
+
+            // Remove itemIndices first so the drain task's finally won't reschedule after we clean up.
             itemIndices.TryRemove(key, out _);
-            pendingPersists.TryRemove(key, out _);
-            persistTasks.TryRemove(key, out _);
+
+            // Await any in-flight drain task so the index it already claimed is flushed to DB.
+            if (persistTasks.TryRemove(key, out var persistTask))
+            {
+                try { await persistTask; } catch { /* already logged in DrainPersistAsync */ }
+            }
+
+            // Flush any remaining pending index (may have been set after the drain completed).
+            if (pendingPersists.TryRemove(key, out var remainingIndex))
+            {
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
+                    await gameRepository.UpdateItemIndexAsync(key.GameId, key.SlotName, remainingIndex);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to flush item index on disconnect for slot {SlotName} in game {GameId}", key.SlotName, key.GameId);
+                }
+            }
         }
         await Task.WhenAll(disconnectTasks);
         primarySessions.TryRemove(gameId, out _);
@@ -344,8 +365,14 @@ public class ArchipelagoService(
     {
         var key = (gameId, slotName);
         pendingPersists[key] = index;
-        // Use GetOrAdd to ensure at most one background drain task runs per slot at a time.
-        persistTasks.GetOrAdd(key, _ => DrainPersistAsync(gameId, slotName));
+        // Use TryAdd to ensure DrainPersistAsync (which starts a Task.Run) is called only when
+        // we definitively own the slot. If TryAdd fails, the existing drain will pick up the
+        // updated pendingPersists value in its next loop iteration or finally reschedule.
+        if (persistTasks.TryAdd(key, Task.CompletedTask))
+        {
+            var task = DrainPersistAsync(gameId, slotName);
+            persistTasks[key] = task;
+        }
     }
 
     private Task DrainPersistAsync(int gameId, string slotName)
@@ -370,10 +397,15 @@ public class ArchipelagoService(
             {
                 persistTasks.TryRemove(key, out _);
                 // Guard against a race where a new pending value was added after the while loop
-                // exited but before the TryRemove above — ensure a new drain task picks it up.
-                if (pendingPersists.ContainsKey(key))
+                // exited but before the TryRemove above. Only reschedule if the slot is still
+                // active (not being disconnected) to avoid leaking tasks after DisconnectAsync.
+                if (itemIndices.ContainsKey(key) && pendingPersists.ContainsKey(key))
                 {
-                    _ = persistTasks.GetOrAdd(key, _ => DrainPersistAsync(gameId, slotName));
+                    if (persistTasks.TryAdd(key, Task.CompletedTask))
+                    {
+                        var newTask = DrainPersistAsync(gameId, slotName);
+                        persistTasks[key] = newTask;
+                    }
                 }
             }
         });
