@@ -37,7 +37,15 @@ public static class Program
     private static void ConfigureServices(IServiceCollection services)
     {
         services
-            .AddLogging(builder => builder.AddConsole())
+            .AddLogging(builder =>
+            {
+                builder.AddSimpleConsole(console =>
+                {
+                    console.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
+                    console.IncludeScopes = true;
+                    console.SingleLine = true;
+                });
+            })
             .ConfigureDb()
             .AddSingleton(new DiscordSocketConfig()
             {
