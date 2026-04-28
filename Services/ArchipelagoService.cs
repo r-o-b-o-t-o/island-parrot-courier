@@ -302,6 +302,11 @@ public class ArchipelagoService(
             var savedIndex = itemIndices.GetValueOrDefault(sessionKey, 0);
             var allItems = helper.AllItemsReceived;
 
+            if (savedIndex > 0 && savedIndex <= allItems.Count)
+            {
+                logger.LogDebug("Skipping {Count} already-processed item(s) for slot {SlotName} in game {GameId}", savedIndex, slotName, gameId);
+            }
+
             uint dropped = 0;
             for (int i = savedIndex; i < allItems.Count; i++)
             {

@@ -17,28 +17,26 @@ public class GameEventDispatcher(
     {
         // Wait for Discord to be ready before processing events, so that channels
         // can be resolved and messages can be sent.
-        if (discordClient.ConnectionState != Discord.ConnectionState.Connected)
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task OnReady()
         {
-            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            tcs.TrySetResult();
+            return Task.CompletedTask;
+        }
 
-            Task OnReady()
+        discordClient.Ready += OnReady;
+        try
+        {
+            // Subscribe before checking state to avoid missing the event.
+            if (discordClient.ConnectionState != Discord.ConnectionState.Connected)
             {
-                tcs.TrySetResult();
-                return Task.CompletedTask;
+                await tcs.Task.WaitAsync(cancellationToken);
             }
-
-            discordClient.Ready += OnReady;
-            try
-            {
-                if (discordClient.ConnectionState != Discord.ConnectionState.Connected)
-                {
-                    await tcs.Task.WaitAsync(cancellationToken);
-                }
-            }
-            finally
-            {
-                discordClient.Ready -= OnReady;
-            }
+        }
+        finally
+        {
+            discordClient.Ready -= OnReady;
         }
         await foreach (var gameEvent in eventChannel.Reader.ReadAllAsync(cancellationToken))
         {
