@@ -80,7 +80,7 @@ IslandParrotCourier/
 │   │   │   ├── PlayerCompletedEventHandler.cs   # Announces world completion
 │   │   │   ├── PlayerJoinedEventHandler.cs      # Handles player join events
 │   │   │   └── PlayerLeftEventHandler.cs        # Handles player disconnect events
-│   │   ├── GameEventChannel.cs                  # Bounded channel (capacity 1000, drops writes when full) for async event queuing
+│   │   ├── GameEventChannel.cs                  # Unbounded channel for async event queuing
 │   │   ├── GameEventDispatcher.cs               # Hosted service that routes events to handlers
 │   │   └── IGameEvent.cs / IGameEventHandler.cs # Event contracts
 │   ├── Repositories/
