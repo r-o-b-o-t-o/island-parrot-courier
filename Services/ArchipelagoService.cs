@@ -284,7 +284,7 @@ public class ArchipelagoService(
     {
         try
         {
-            var dropped = 0;
+            uint dropped = 0;
             while (helper.Any())
             {
                 var item = helper.DequeueItem();
