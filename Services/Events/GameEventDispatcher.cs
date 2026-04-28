@@ -1,3 +1,4 @@
+using Discord.WebSocket;
 using IslandParrotCourier.Services.Events.Handlers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -7,12 +8,38 @@ namespace IslandParrotCourier.Services.Events;
 
 public class GameEventDispatcher(
         GameEventChannel eventChannel,
+        DiscordSocketClient discordClient,
         IServiceScopeFactory scopeFactory,
         ILogger<GameEventDispatcher> logger
     ) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        // Wait for Discord to be ready before processing events, so that channels
+        // can be resolved and messages can be sent.
+        if (discordClient.ConnectionState != Discord.ConnectionState.Connected)
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            Task OnReady()
+            {
+                tcs.TrySetResult();
+                return Task.CompletedTask;
+            }
+
+            discordClient.Ready += OnReady;
+            try
+            {
+                if (discordClient.ConnectionState != Discord.ConnectionState.Connected)
+                {
+                    await tcs.Task.WaitAsync(cancellationToken);
+                }
+            }
+            finally
+            {
+                discordClient.Ready -= OnReady;
+            }
+        }
         await foreach (var gameEvent in eventChannel.Reader.ReadAllAsync(cancellationToken))
         {
             try

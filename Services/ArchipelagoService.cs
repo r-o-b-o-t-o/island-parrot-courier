@@ -25,6 +25,9 @@ public class ArchipelagoService(
     // Tracks the key of the session currently subscribed to MessageLog for each game.
     private readonly ConcurrentDictionary<int, (int GameId, string SlotName)> primarySessions = new();
 
+    // Tracks the last processed item index per slot, to avoid re-processing items on reconnect.
+    private readonly ConcurrentDictionary<(int GameId, string SlotName), int> itemIndices = new();
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
@@ -65,6 +68,11 @@ public class ArchipelagoService(
             await existing.Socket.DisconnectAsync();
             sessions.TryRemove((gameId, slotName), out _);
         }
+
+        using var scope = scopeFactory.CreateScope();
+        var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
+        var player = await gameRepository.GetPlayerBySlotAsync(gameId, slotName);
+        itemIndices[(gameId, slotName)] = player?.ItemIndex ?? 0;
 
         var session = ArchipelagoSessionFactory.CreateSession(host, port);
 
@@ -284,10 +292,20 @@ public class ArchipelagoService(
     {
         try
         {
-            uint dropped = 0;
+            // Drain the pending queue so the library's internal state stays consistent.
             while (helper.Any())
             {
-                var item = helper.DequeueItem();
+                helper.DequeueItem();
+            }
+
+            var sessionKey = (gameId, slotName);
+            var savedIndex = itemIndices.GetValueOrDefault(sessionKey, 0);
+            var allItems = helper.AllItemsReceived;
+
+            uint dropped = 0;
+            for (int i = savedIndex; i < allItems.Count; i++)
+            {
+                var item = allItems[i];
                 if (!eventChannel.Writer.TryWrite(new ItemSentEvent(
                     gameId,
                     item.Player.Name,
@@ -298,6 +316,24 @@ public class ArchipelagoService(
                 {
                     dropped++;
                 }
+            }
+
+            if (allItems.Count > savedIndex)
+            {
+                itemIndices[sessionKey] = allItems.Count;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = scopeFactory.CreateScope();
+                        var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
+                        await gameRepository.UpdateItemIndexAsync(gameId, slotName, allItems.Count);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to persist item index for slot {SlotName} in game {GameId}", slotName, gameId);
+                    }
+                });
             }
 
             if (dropped > 0)
