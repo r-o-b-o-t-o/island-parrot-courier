@@ -284,6 +284,7 @@ public class ArchipelagoService(
     {
         try
         {
+            var dropped = 0;
             while (helper.Any())
             {
                 var item = helper.DequeueItem();
@@ -295,8 +296,13 @@ public class ArchipelagoService(
                     item.LocationDisplayName
                 )))
                 {
-                    logger.LogWarning("Event channel full; dropping ItemSentEvent for game {GameId}", gameId);
+                    dropped++;
                 }
+            }
+
+            if (dropped > 0)
+            {
+                logger.LogWarning("Event channel full; dropped {Count} ItemSentEvent(s) for game {GameId}", dropped, gameId);
             }
         }
         catch (Exception ex)
