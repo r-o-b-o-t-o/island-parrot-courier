@@ -18,7 +18,7 @@ public class DiscordClientService(
 {
     private bool commandsRegistered;
     private readonly ConcurrentDictionary<IInteractionContext, IServiceScope> activeScopes = new();
-    private readonly TaskCompletionSource readyTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private volatile TaskCompletionSource readyTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public Task WaitForReadyAsync(CancellationToken cancellationToken = default) =>
         readyTcs.Task.WaitAsync(cancellationToken);
@@ -57,6 +57,13 @@ public class DiscordClientService(
                 await interactions.RegisterCommandsGloballyAsync();
                 logger.LogInformation("Commands registered globally");
             }
+        };
+
+        client.Disconnected += _ =>
+        {
+            // Reset the TCS so that WaitForReadyAsync blocks again until the next Ready event.
+            readyTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            return Task.CompletedTask;
         };
 
         client.InteractionCreated += async interaction =>

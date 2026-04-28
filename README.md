@@ -98,9 +98,11 @@ IslandParrotCourier/
 |---------|------|
 | `ArchipelagoService` | Hosted service that connects to Archipelago servers, tracks active sessions per game, and publishes events to `GameEventChannel` |
 | `DiscordClientService` | Hosted service that starts the Discord WebSocket client and registers slash command interactions |
-| `GameEventChannel` | Thread-safe `System.Threading.Channels` pipeline (unbounded) used to decouple Archipelago event production from Discord notification delivery; all events are guaranteed to be processed |
+| `GameEventChannel` | Thread-safe `System.Threading.Channels` pipeline (unbounded) used to decouple Archipelago event production from Discord notification delivery; during normal operation, events are queued without drop-on-full behavior |
 | `GameEventDispatcher` | Hosted service that reads from `GameEventChannel` and dispatches events to the appropriate `IGameEventHandler` |
 | `GameRepository` | EF Core repository providing scoped data access for game sessions and registered players |
+
+> **Note:** `GameEventChannel` is an in-memory queue. It helps absorb bursts of events, but it does not provide durable delivery across process crashes or restarts, and events may still be missed if upstream connections drop or if dispatch/handler execution fails.
 
 ## 📝 License
 

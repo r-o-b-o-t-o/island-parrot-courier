@@ -28,6 +28,10 @@ public class ArchipelagoService(
     // Tracks the last processed item index per slot, to avoid re-processing items on reconnect.
     private readonly ConcurrentDictionary<(int GameId, string SlotName), int> itemIndices = new();
 
+    // Coalesces async item-index persistence: at most one background task per slot runs at a time.
+    private readonly ConcurrentDictionary<(int GameId, string SlotName), int> pendingPersists = new();
+    private readonly ConcurrentDictionary<(int GameId, string SlotName), Task> persistTasks = new();
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
@@ -144,6 +148,8 @@ public class ArchipelagoService(
                 disconnectTasks.Add(session.Socket.DisconnectAsync());
             }
             itemIndices.TryRemove(key, out _);
+            pendingPersists.TryRemove(key, out _);
+            persistTasks.TryRemove(key, out _);
         }
         await Task.WhenAll(disconnectTasks);
         primarySessions.TryRemove(gameId, out _);
@@ -325,26 +331,52 @@ public class ArchipelagoService(
             if (newIndex > savedIndex)
             {
                 itemIndices[sessionKey] = newIndex;
-                var indexToPersist = newIndex;
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        using var scope = scopeFactory.CreateScope();
-                        var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
-                        await gameRepository.UpdateItemIndexAsync(gameId, slotName, indexToPersist);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Failed to persist item index for slot {SlotName} in game {GameId}", slotName, gameId);
-                    }
-                });
+                ScheduleIndexPersist(gameId, slotName, newIndex);
             }
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error enqueuing item received event for game {GameId}", gameId);
         }
+    }
+
+    private void ScheduleIndexPersist(int gameId, string slotName, int index)
+    {
+        var key = (gameId, slotName);
+        pendingPersists[key] = index;
+        // Use GetOrAdd to ensure at most one background drain task runs per slot at a time.
+        persistTasks.GetOrAdd(key, _ => DrainPersistAsync(gameId, slotName));
+    }
+
+    private Task DrainPersistAsync(int gameId, string slotName)
+    {
+        return Task.Run(async () =>
+        {
+            var key = (GameId: gameId, SlotName: slotName);
+            try
+            {
+                while (pendingPersists.TryRemove(key, out var index))
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
+                    await gameRepository.UpdateItemIndexAsync(gameId, slotName, index);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to persist item index for slot {SlotName} in game {GameId}", slotName, gameId);
+            }
+            finally
+            {
+                persistTasks.TryRemove(key, out _);
+                // Guard against a race where a new pending value was added after the while loop
+                // exited but before the TryRemove above — ensure a new drain task picks it up.
+                if (pendingPersists.ContainsKey(key))
+                {
+                    _ = persistTasks.GetOrAdd(key, _ => DrainPersistAsync(gameId, slotName));
+                }
+            }
+        });
     }
 
     private void OnGoalMessage(int gameId, GoalLogMessage goalMessage)

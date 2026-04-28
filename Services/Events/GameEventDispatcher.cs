@@ -16,13 +16,17 @@ public class GameEventDispatcher(
     {
         await foreach (var gameEvent in eventChannel.Reader.ReadAllAsync(cancellationToken))
         {
-            // Wait for Discord to be ready before dispatching each event, so that channels
-            // can be resolved and messages can be sent. After the first ready, this is a no-op.
-            await discordClientService.WaitForReadyAsync(cancellationToken);
             try
             {
+                // Wait for Discord to be ready before dispatching each event, so that channels
+                // can be resolved and messages can be sent. After the first ready, this is a no-op.
+                await discordClientService.WaitForReadyAsync(cancellationToken);
                 using var scope = scopeFactory.CreateScope();
                 await DispatchAsync(gameEvent, scope.ServiceProvider);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
