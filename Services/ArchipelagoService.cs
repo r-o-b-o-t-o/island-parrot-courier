@@ -336,12 +336,6 @@ public class ArchipelagoService(
                     {
                         using var scope = scopeFactory.CreateScope();
                         var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
-                        var player = await gameRepository.GetPlayerBySlotAsync(gameId, slotName);
-                        if (player is null)
-                        {
-                            logger.LogDebug("Skipping item index persistence for unregistered slot {SlotName} in game {GameId}", slotName, gameId);
-                            return;
-                        }
                         await gameRepository.UpdateItemIndexAsync(gameId, slotName, indexToPersist);
                     }
                     catch (Exception ex)
