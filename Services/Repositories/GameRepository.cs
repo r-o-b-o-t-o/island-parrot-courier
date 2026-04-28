@@ -64,13 +64,9 @@ public class GameRepository(AppDbContext db) : IGameRepository
 
     public async Task UpdateItemIndexAsync(int gameId, string slotName, int itemIndex)
     {
-        var player = await db.Players.FirstOrDefaultAsync(p => p.GameId == gameId && p.SlotName == slotName)
-            ?? throw new InvalidOperationException($"Player with slot \"{slotName}\" not found in game {gameId}.");
-        if (itemIndex > player.ItemIndex)
-        {
-            player.ItemIndex = itemIndex;
-            await db.SaveChangesAsync();
-        }
+        await db.Players
+            .Where(p => p.GameId == gameId && p.SlotName == slotName && p.ItemIndex < itemIndex)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(p => p.ItemIndex, itemIndex));
     }
 
     public async Task MarkGameCompletedAsync(int gameId)

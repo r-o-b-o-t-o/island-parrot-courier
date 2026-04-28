@@ -18,6 +18,10 @@ public class DiscordClientService(
 {
     private bool commandsRegistered;
     private readonly ConcurrentDictionary<IInteractionContext, IServiceScope> activeScopes = new();
+    private readonly TaskCompletionSource readyTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public Task WaitForReadyAsync(CancellationToken cancellationToken = default) =>
+        readyTcs.Task.WaitAsync(cancellationToken);
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -32,6 +36,8 @@ public class DiscordClientService(
 
         client.Ready += async () =>
         {
+            readyTcs.TrySetResult();
+
             if (commandsRegistered)
             {
                 return;

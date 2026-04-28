@@ -143,6 +143,7 @@ public class ArchipelagoService(
             {
                 disconnectTasks.Add(session.Socket.DisconnectAsync());
             }
+            itemIndices.TryRemove(key, out _);
         }
         await Task.WhenAll(disconnectTasks);
         primarySessions.TryRemove(gameId, out _);
@@ -307,7 +308,7 @@ public class ArchipelagoService(
                 logger.LogDebug("Skipping {Count} already-processed item(s) for slot {SlotName} in game {GameId}", savedIndex, slotName, gameId);
             }
 
-            uint dropped = 0;
+            int newIndex = savedIndex;
             for (int i = savedIndex; i < allItems.Count; i++)
             {
                 var item = allItems[i];
@@ -319,31 +320,35 @@ public class ArchipelagoService(
                     item.LocationDisplayName
                 )))
                 {
-                    dropped++;
+                    logger.LogWarning("Event channel full; stopped processing items at index {Index} for slot {SlotName} in game {GameId}", i, slotName, gameId);
+                    break;
                 }
+                newIndex = i + 1;
             }
 
-            if (allItems.Count > savedIndex)
+            if (newIndex > savedIndex)
             {
-                itemIndices[sessionKey] = allItems.Count;
+                itemIndices[sessionKey] = newIndex;
+                var indexToPersist = newIndex;
                 _ = Task.Run(async () =>
                 {
                     try
                     {
                         using var scope = scopeFactory.CreateScope();
                         var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
-                        await gameRepository.UpdateItemIndexAsync(gameId, slotName, allItems.Count);
+                        var player = await gameRepository.GetPlayerBySlotAsync(gameId, slotName);
+                        if (player is null)
+                        {
+                            logger.LogDebug("Skipping item index persistence for unregistered slot {SlotName} in game {GameId}", slotName, gameId);
+                            return;
+                        }
+                        await gameRepository.UpdateItemIndexAsync(gameId, slotName, indexToPersist);
                     }
                     catch (Exception ex)
                     {
                         logger.LogError(ex, "Failed to persist item index for slot {SlotName} in game {GameId}", slotName, gameId);
                     }
                 });
-            }
-
-            if (dropped > 0)
-            {
-                logger.LogWarning("Event channel full; dropped {Count} ItemSentEvent(s) for game {GameId}", dropped, gameId);
             }
         }
         catch (Exception ex)
