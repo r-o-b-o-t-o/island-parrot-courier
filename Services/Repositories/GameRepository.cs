@@ -62,6 +62,13 @@ public class GameRepository(AppDbContext db) : IGameRepository
         await db.SaveChangesAsync();
     }
 
+    public async Task UpdateItemIndexAsync(int gameId, string slotName, int itemIndex)
+    {
+        await db.Players
+            .Where(p => p.GameId == gameId && p.SlotName == slotName && p.ItemIndex < itemIndex)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(p => p.ItemIndex, itemIndex));
+    }
+
     public async Task MarkGameCompletedAsync(int gameId)
     {
         var game = await db.Games.FindAsync(gameId)

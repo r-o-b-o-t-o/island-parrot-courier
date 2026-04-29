@@ -25,6 +25,13 @@ public class ArchipelagoService(
     // Tracks the key of the session currently subscribed to MessageLog for each game.
     private readonly ConcurrentDictionary<int, (int GameId, string SlotName)> primarySessions = new();
 
+    // Tracks the last processed item index per slot, to avoid re-processing items on reconnect.
+    private readonly ConcurrentDictionary<(int GameId, string SlotName), int> itemIndices = new();
+
+    // Coalesces async item-index persistence: at most one background task per slot runs at a time.
+    private readonly ConcurrentDictionary<(int GameId, string SlotName), int> pendingPersists = new();
+    private readonly ConcurrentDictionary<(int GameId, string SlotName), Task> persistTasks = new();
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
@@ -66,6 +73,10 @@ public class ArchipelagoService(
             sessions.TryRemove((gameId, slotName), out _);
         }
 
+        using var scope = scopeFactory.CreateScope();
+        var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
+        var player = await gameRepository.GetPlayerBySlotAsync(gameId, slotName);
+
         var session = ArchipelagoSessionFactory.CreateSession(host, port);
 
         var result = session.TryConnectAndLogin(
@@ -82,6 +93,7 @@ public class ArchipelagoService(
         }
 
         sessions[(gameId, slotName)] = session;
+        itemIndices[(gameId, slotName)] = player?.ItemIndex ?? 0;
 
         session.Items.ItemReceived += (helper) => OnItemReceived(gameId, slotName, helper);
 
@@ -134,6 +146,30 @@ public class ArchipelagoService(
             if (sessions.TryRemove(key, out var session))
             {
                 disconnectTasks.Add(session.Socket.DisconnectAsync());
+            }
+
+            // Remove itemIndices first so the drain task's finally won't reschedule after we clean up.
+            itemIndices.TryRemove(key, out _);
+
+            // Await any in-flight drain task so the index it already claimed is flushed to DB.
+            if (persistTasks.TryRemove(key, out var persistTask))
+            {
+                try { await persistTask; } catch { /* already logged in DrainPersistAsync */ }
+            }
+
+            // Flush any remaining pending index (may have been set after the drain completed).
+            if (pendingPersists.TryRemove(key, out var remainingIndex))
+            {
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
+                    await gameRepository.UpdateItemIndexAsync(key.GameId, key.SlotName, remainingIndex);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to flush item index on disconnect for slot {SlotName} in game {GameId}", key.SlotName, key.GameId);
+                }
             }
         }
         await Task.WhenAll(disconnectTasks);
@@ -284,25 +320,39 @@ public class ArchipelagoService(
     {
         try
         {
-            uint dropped = 0;
+            // Drain the pending queue so the library's internal state stays consistent.
             while (helper.Any())
             {
-                var item = helper.DequeueItem();
-                if (!eventChannel.Writer.TryWrite(new ItemSentEvent(
+                helper.DequeueItem();
+            }
+
+            var sessionKey = (gameId, slotName);
+            var savedIndex = itemIndices.GetValueOrDefault(sessionKey, 0);
+            var allItems = helper.AllItemsReceived;
+
+            if (savedIndex > 0 && savedIndex <= allItems.Count)
+            {
+                logger.LogDebug("Skipping {Count} already-processed item(s) for slot {SlotName} in game {GameId}", savedIndex, slotName, gameId);
+            }
+
+            int newIndex = savedIndex;
+            for (int i = savedIndex; i < allItems.Count; i++)
+            {
+                var item = allItems[i];
+                eventChannel.Writer.TryWrite(new ItemSentEvent(
                     gameId,
                     item.Player.Name,
                     slotName,
                     item.ItemDisplayName,
                     item.LocationDisplayName
-                )))
-                {
-                    dropped++;
-                }
+                ));
+                newIndex = i + 1;
             }
 
-            if (dropped > 0)
+            if (newIndex > savedIndex)
             {
-                logger.LogWarning("Event channel full; dropped {Count} ItemSentEvent(s) for game {GameId}", dropped, gameId);
+                itemIndices[sessionKey] = newIndex;
+                ScheduleIndexPersist(gameId, slotName, newIndex);
             }
         }
         catch (Exception ex)
@@ -311,17 +361,64 @@ public class ArchipelagoService(
         }
     }
 
+    private void ScheduleIndexPersist(int gameId, string slotName, int index)
+    {
+        var key = (gameId, slotName);
+        pendingPersists[key] = index;
+        // Use TryAdd to ensure DrainPersistAsync (which starts a Task.Run) is called only when
+        // we definitively own the slot. If TryAdd fails, the existing drain will pick up the
+        // updated pendingPersists value in its next loop iteration or finally reschedule.
+        if (persistTasks.TryAdd(key, Task.CompletedTask))
+        {
+            var task = DrainPersistAsync(gameId, slotName);
+            persistTasks[key] = task;
+        }
+    }
+
+    private Task DrainPersistAsync(int gameId, string slotName)
+    {
+        return Task.Run(async () =>
+        {
+            var key = (GameId: gameId, SlotName: slotName);
+            try
+            {
+                while (pendingPersists.TryRemove(key, out var index))
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var gameRepository = scope.ServiceProvider.GetRequiredService<IGameRepository>();
+                    await gameRepository.UpdateItemIndexAsync(gameId, slotName, index);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to persist item index for slot {SlotName} in game {GameId}", slotName, gameId);
+            }
+            finally
+            {
+                persistTasks.TryRemove(key, out _);
+                // Guard against a race where a new pending value was added after the while loop
+                // exited but before the TryRemove above. Only reschedule if the slot is still
+                // active (not being disconnected) to avoid leaking tasks after DisconnectAsync.
+                if (itemIndices.ContainsKey(key) && pendingPersists.ContainsKey(key))
+                {
+                    if (persistTasks.TryAdd(key, Task.CompletedTask))
+                    {
+                        var newTask = DrainPersistAsync(gameId, slotName);
+                        persistTasks[key] = newTask;
+                    }
+                }
+            }
+        });
+    }
+
     private void OnGoalMessage(int gameId, GoalLogMessage goalMessage)
     {
         try
         {
-            if (!eventChannel.Writer.TryWrite(new PlayerCompletedEvent(
+            eventChannel.Writer.TryWrite(new PlayerCompletedEvent(
                 gameId,
                 goalMessage.Player.Name
-            )))
-            {
-                logger.LogWarning("Event channel full; dropping PlayerCompletedEvent for game {GameId}", gameId);
-            }
+            ));
         }
         catch (Exception ex)
         {
@@ -333,14 +430,11 @@ public class ArchipelagoService(
     {
         try
         {
-            if (!eventChannel.Writer.TryWrite(new PlayerJoinedEvent(
+            eventChannel.Writer.TryWrite(new PlayerJoinedEvent(
                 gameId,
                 joinMessage.Player.Name,
                 joinMessage.Player.Game
-            )))
-            {
-                logger.LogWarning("Event channel full; dropping PlayerJoinedEvent for game {GameId}", gameId);
-            }
+            ));
         }
         catch (Exception ex)
         {
@@ -352,13 +446,10 @@ public class ArchipelagoService(
     {
         try
         {
-            if (!eventChannel.Writer.TryWrite(new PlayerLeftEvent(
+            eventChannel.Writer.TryWrite(new PlayerLeftEvent(
                 gameId,
                 leaveMessage.Player.Name
-            )))
-            {
-                logger.LogWarning("Event channel full; dropping PlayerLeftEvent for game {GameId}", gameId);
-            }
+            ));
         }
         catch (Exception ex)
         {

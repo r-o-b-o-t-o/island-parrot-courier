@@ -7,6 +7,7 @@ public class Player
     public ulong DiscordUserId { get; set; }
     public required string SlotName { get; set; }
     public bool IsCompleted { get; set; }
+    public int ItemIndex { get; set; }
 
     public required Game Game { get; set; }
 

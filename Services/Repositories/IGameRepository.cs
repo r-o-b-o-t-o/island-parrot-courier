@@ -10,6 +10,7 @@ public interface IGameRepository
     Task<Game> GetGameByChannelAsync(ulong channelId);
     Task<Player> RegisterPlayerAsync(Game game, ulong discordUserId, string slotName);
     Task MarkPlayerCompletedAsync(int playerId);
+    Task UpdateItemIndexAsync(int gameId, string slotName, int itemIndex);
     Task MarkGameCompletedAsync(int gameId);
     Task<List<Player>> GetPlayersAsync(int gameId);
     Task<Player> GetPlayerBySlotAsync(int gameId, string slotName);

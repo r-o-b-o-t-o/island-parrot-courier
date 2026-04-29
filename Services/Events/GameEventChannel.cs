@@ -5,9 +5,8 @@ namespace IslandParrotCourier.Services.Events;
 public class GameEventChannel
 {
     private readonly Channel<IGameEvent> channel =
-        Channel.CreateBounded<IGameEvent>(new BoundedChannelOptions(1000)
+        Channel.CreateUnbounded<IGameEvent>(new UnboundedChannelOptions
         {
-            FullMode = BoundedChannelFullMode.DropWrite,
             SingleReader = true,
         });
 
