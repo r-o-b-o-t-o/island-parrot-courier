@@ -59,9 +59,17 @@ public class DiscordClientService(
             }
         };
 
+        client.Connected += () =>
+        {
+            // On a resumed session, Ready is not fired again — only Connected is.
+            // Completing the TCS here unblocks WaitForReadyAsync after any reconnect.
+            readyTcs.TrySetResult();
+            return Task.CompletedTask;
+        };
+
         client.Disconnected += _ =>
         {
-            // Reset the TCS so that WaitForReadyAsync blocks again until the next Ready event.
+            // Reset the TCS so that WaitForReadyAsync blocks again until Connected/Ready fires.
             readyTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             return Task.CompletedTask;
         };
