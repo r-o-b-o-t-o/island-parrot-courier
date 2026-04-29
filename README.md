@@ -2,6 +2,7 @@
 
 A Discord bot that integrates with [Archipelago](https://archipelago.gg/) multiworld randomizer servers to provide real-time game tracking, notifications, and progress monitoring.
 
+![Build](https://github.com/r-o-b-o-t-o/island-parrot-courier/actions/workflows/build.yml/badge.svg?branch=master)
 ![.NET 10](https://img.shields.io/badge/.NET-10-purple)
 ![Discord.Net](https://img.shields.io/badge/Discord.Net-3.19-blue)
 ![Archipelago](https://img.shields.io/badge/Archipelago-MultiClient.Net-green)
