@@ -20,8 +20,20 @@ public class DiscordClientService(
     private readonly ConcurrentDictionary<IInteractionContext, IServiceScope> activeScopes = new();
     private volatile TaskCompletionSource readyTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public Task WaitForReadyAsync(CancellationToken cancellationToken = default) =>
-        readyTcs.Task.WaitAsync(cancellationToken);
+    public async Task WaitForReadyAsync(CancellationToken cancellationToken = default)
+    {
+        // Loop in case a disconnect races with our await: Disconnected completes the old TCS
+        // so we wake up, detect a stale TCS, and re-wait on the freshly created one.
+        while (true)
+        {
+            var tcs = readyTcs;
+            await tcs.Task.WaitAsync(cancellationToken);
+            if (readyTcs == tcs)
+            {
+                return;
+            }
+        }
+    }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -62,15 +74,22 @@ public class DiscordClientService(
         client.Connected += () =>
         {
             // On a resumed session, Ready is not fired again — only Connected is.
-            // Completing the TCS here unblocks WaitForReadyAsync after any reconnect.
-            readyTcs.TrySetResult();
+            // Gate on commandsRegistered (set on first Ready) so we don't unblock
+            // WaitForReadyAsync before Discord's cache is populated on initial startup.
+            if (commandsRegistered)
+            {
+                readyTcs.TrySetResult();
+            }
             return Task.CompletedTask;
         };
 
         client.Disconnected += _ =>
         {
-            // Reset the TCS so that WaitForReadyAsync blocks again until Connected/Ready fires.
+            // Swap in a new TCS and complete the old one so any in-flight WaitForReadyAsync
+            // callers wake up, detect the stale TCS in their loop, and re-wait on the new one.
+            var oldTcs = readyTcs;
             readyTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            oldTcs.TrySetResult();
             return Task.CompletedTask;
         };
 
